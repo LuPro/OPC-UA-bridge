@@ -13,7 +13,7 @@ class Forwarder:
     async def read_tcp(self):
         while True:
             data = (await self.__tcp_reader.readuntil(b"\0")).decode()[:-1]
-            print("Got data from TCP:", data)
+            #print("Got data from TCP:", data)
             if not data:
                 _logger.error("Reading from TCP socket gave no data")
                 break
@@ -22,7 +22,7 @@ class Forwarder:
     async def write_tcp(self):
         while True:
             data = await self.__queue_opcua_tcp.get()
-            print("got opc data, Writing data to TCP:", data)
+            print("opc_tcp:", data)
             try:
                 self.__tcp_writer.write(data.encode())
             except Exception as e:

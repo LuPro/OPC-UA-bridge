@@ -46,8 +46,8 @@ async def main():
 
     opcua = OpcuaClient(forwarder.get_opcua_tcp_queue(), forwarder.get_tcp_opcua_queue())
     asyncio.gather(
-        opcua.connect("opc.tcp://172.21.55.10:4840"),
-        #opcua.connect("opc.tcp://0.0.0.0:4840/freeopcua/server/"),
+        #opcua.connect("opc.tcp://172.21.55.10:4840"),
+        opcua.connect("opc.tcp://0.0.0.0:4840/freeopcua/server/"),
         forwarder.read_tcp(),
         forwarder.write_tcp(),
         opcua.write_opcua()

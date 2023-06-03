@@ -33,7 +33,7 @@ class Forwarder:
     def __init__(self, tcp_reader, tcp_writer):
         self.__tcp_reader = tcp_reader
         self.__tcp_writer = tcp_writer
-        self.__tcp_writer.write("this is a message".encode())
+        #self.__tcp_writer.write("this is a message".encode())
 
         self.__queue_tcp_opcua = asyncio.Queue()
         self.__queue_opcua_tcp = asyncio.Queue()

@@ -2,7 +2,7 @@ import logging
 import asyncio
 from datetime import datetime
 
-from asyncua import Client
+from asyncua import Client, ua
 from asyncua.ua.uatypes import VariantType as VariantType
 from asyncua.ua.uatypes import DataValue as DataValue
 from asyncua.common import ua_utils
@@ -19,16 +19,19 @@ class SubHandler(object):
     """
 
     async def datachange_notification(self, node, val, data):
-        print("New data change event", node, val, data)
+        #print("New data change event", node, val, data)
+        print("New data change event", node, val)
         json_data = { "packets": [] }
-        print("data type", await node.read_data_type_as_variant_type())
+
+        #print("data type", await node.read_data_type_as_variant_type())
         if (await node.read_data_type_as_variant_type() == VariantType.Boolean):
             val = 1 if val else 0
+        #TODO: investigate which if any other data types need to be supported here or if the rest is fine with implicit casts
+
         data_packet = {"name": "/".join((await node.get_path(as_string=True))[2:]) , "value": val}
         json_data["packets"].append(data_packet)
         await self.__queue.put(json.dumps(json_data))
-        print("queue size:", self.__queue.qsize())
-
+        #print("queue size:", self.__queue.qsize())
 
     def event_notification(self, event):
         print("New event", event)
@@ -45,25 +48,35 @@ class OpcuaClient:
                 node = await self.__client.nodes.objects.get_child(data["packets"][0]["name"].split("/"))
                 value = data["packets"][0]["value"]
                 data_variant_type = await node.read_data_type_as_variant_type()
+
                 if (data_variant_type == VariantType.Boolean):
                     value = True if value else False
-                print("trying to write", value, data_variant_type)
-                opc_value = DataValue(int(value), data_variant_type)
-                #opc_value.SourceTimestamp = 0 #datetime.now()
-                await node.set_data_value(opc_value)
+                elif (data_variant_type == VariantType.Double):
+                    value = float(value)
+                #TODO: support remaining needed data types
+
+                await node.write_value(ua.Variant(value, data_variant_type))
             except Exception as e:
                 print("exception during writing to opcua:", e)
 
     async def connect(self, serverUrl):
         async with Client(url=serverUrl) as client:
+            #need to wrap all with a try except because all unhandled exceptions in any of the OPC functions
+            #will just cause freeopcua library client to disconnect without any visible error
             try:
+                is_mock_server = False
+                if (serverUrl == "opc.tcp://0.0.0.0:4840/freeopcua/server/"):
+                    is_mock_server = True
+
                 self.__client = client
                 _logger.info("\n\n-----\n")
                 _logger.info("Root node is: %r", client.nodes.root)
                 _logger.info("Objects node is: %r", client.nodes.objects)
 
-                #uri = "http://examples.freeopcua.github.io"
-                uri = "http://auto.tuwien.ac.at/iot-lab/Node-RED/01_Distribution"
+                if (is_mock_server):
+                    uri = "http://examples.freeopcua.github.io"
+                else:
+                    uri = "http://auto.tuwien.ac.at/iot-lab/Node-RED/01_Distribution"
                 idx = await client.get_namespace_index(uri)
                 _logger.info("index of our namespace is %s", idx)
 
@@ -77,23 +90,21 @@ class OpcuaClient:
                 #await var.write_value(3.9) # set node value using implicit data type
 
                 # Now getting a variable node using its browse path
-                #_logger.info("load opc structure")
                 handler = SubHandler(self.__opc_tcp_queue)
                 await self.load_opc_structure(handler, client.nodes.objects)
                 _logger.info("\n\nhello %r\n\n", self.__opc_structure)
                 #_logger.info("done")
-                #myvar = await client.nodes.root.get_child(["0:Objects", "2:MyObject", "2:MyVariable"])
-                #obj = await client.nodes.root.get_child(["0:Objects", "2:MyObject"])
-                myvar = await client.nodes.objects.get_child(["4:01_Distribution", "4:Indicators", "4:Lights", "4:Red"])
+                if (is_mock_server):
+                    myvar = await client.nodes.root.get_child(["0:Objects", "2:MyObject", "2:MyVariable"])
+                    obj = await client.nodes.root.get_child(["0:Objects", "2:MyObject"])
+                else:
+                    myvar = await client.nodes.objects.get_child(["4:01_Distribution", "4:Indicators", "4:Lights", "4:Red"])
                 _logger.info("myvar is: %r", myvar)
 
-                # subscribing to a variable node
-                sub = await client.create_subscription(1, handler)
-                handle = await sub.subscribe_data_change(myvar)
                 await asyncio.sleep(0.1)
 
                 # we can also subscribe to events from server
-                await sub.subscribe_events()
+                #await sub.subscribe_events()
                 # await sub.unsubscribe(handle)
                 # await sub.delete()
 
@@ -111,7 +122,8 @@ class OpcuaClient:
             if (len(children) == 0):
                 #print("no further children")
                 if ((await parent.read_browse_name()).Name == "Red" or
-                    (await parent.read_browse_name()).Name == "Product"):
+                    (await parent.read_browse_name()).Name == "Product" or
+                    (await parent.read_browse_name()).Name == "MyVariable"):
                     print ("subscribing to", (await parent.read_browse_name()).Name)
                     sub = await self.__client.create_subscription(10, sub_handler)
                     await sub.subscribe_data_change(parent)

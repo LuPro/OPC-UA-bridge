@@ -3,6 +3,7 @@ import logging
 
 _logger = logging.getLogger("root")
 
+
 class Forwarder:
     def get_tcp_opcua_queue(self):
         return self.__queue_tcp_opcua
@@ -13,7 +14,7 @@ class Forwarder:
     async def read_tcp(self):
         while True:
             data = (await self.__tcp_reader.readuntil(b"\0")).decode()[:-1]
-            #print("Got data from TCP:", data)
+            # print("Got data from TCP:", data)
             if not data:
                 _logger.error("Reading from TCP socket gave no data")
                 break
@@ -29,11 +30,9 @@ class Forwarder:
                 print("exception during writing", e)
             await self.__tcp_writer.drain()
 
-
     def __init__(self, tcp_reader, tcp_writer):
         self.__tcp_reader = tcp_reader
         self.__tcp_writer = tcp_writer
-        #self.__tcp_writer.write("this is a message".encode())
 
         self.__queue_tcp_opcua = asyncio.Queue()
         self.__queue_opcua_tcp = asyncio.Queue()

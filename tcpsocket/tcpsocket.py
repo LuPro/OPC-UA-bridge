@@ -3,11 +3,12 @@ import asyncio
 
 _logger = logging.getLogger("root")
 
+
 class TcpSocket:
-    async def connect(self, address = "localhost", port = 3000):
+    async def connect(self, address="localhost", port=3000):
         self.__value = 0
         self.__reader, self.__writer = await asyncio.open_connection(address, port)
-        #TODO: the protocol selection is still very much a prototype
+        # TODO: the protocol selection is still very much a prototype
         self.__writer.write('{"protocol": "native", "version": 0}'.encode())
         await self.__writer.drain()
 

@@ -43,8 +43,10 @@ async def main():
     # asyncio.gather(
     #     tcpsocket.connect()
     # )
+    # await tcpsocket.connect("192.168.0.101")
     await tcpsocket.connect()
-    #I'd like to set this up before connecting tcp, but before connecting I have no stream reader/writer
+    # I'd like to set this up before connecting tcp, but before connecting
+    # I have no stream reader/writer
     forwarder = Forwarder(tcpsocket.get_reader(), tcpsocket.get_writer())
 
     opcua = OpcuaClient(forwarder.get_opcua_tcp_queue(), forwarder.get_tcp_opcua_queue())
@@ -60,5 +62,5 @@ async def main():
         await asyncio.sleep(1)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
     asyncio.run(main())

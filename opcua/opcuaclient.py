@@ -20,7 +20,7 @@ class SubHandler(object):
 
     async def datachange_notification(self, node, val, data):
         # print("New data change event", node, val, data)
-        print("New data change event", node, val)
+        # print("New data change event", node, val)
         json_data = {"packets": []}
 
         # print("data type", await node.read_data_type_as_variant_type())
@@ -35,7 +35,7 @@ class SubHandler(object):
         }
         # TODO: handle OPC methods since they have a different val that is not serializable
         json_data["packets"].append(data_packet)
-        print("JSON data", json_data)
+        # print("JSON", json_data)
         await self.__queue.put(json.dumps(json_data))
         # print("queue size:", self.__queue.qsize())
 
@@ -105,11 +105,12 @@ class OpcuaClient:
                 self.__items = ua.CreateMonitoredItemsParameters()
                 await self.load_opc_nodes(client.nodes.objects)
                 print("items", len(self.__items.ItemsToCreate))
-                sub = await self.__client.create_subscription(10, handler)
+                sub = await self.__client.create_subscription(100, handler)
+                print("number of monitored items:", len(self.__items.ItemsToCreate))
                 await sub.create_monitored_items(self.__items.ItemsToCreate)
                 # _logger.info("done")
                 if (is_mock_server):
-                    myvar = await client.nodes.root.get_child(["0:Objects", "2:MyObject", "2:MyVariable"])
+                    myvar = await client.nodes.root.get_child(["0:Objects", "2:MyObject", "2:MyVariable1"])
                     obj = await client.nodes.root.get_child(["0:Objects", "2:MyObject"])
                 else:
                     myvar = await client.nodes.objects.get_child(["4:01_Distribution", "4:Indicators", "4:Lights", "4:Red"])
@@ -135,13 +136,19 @@ class OpcuaClient:
             children = await parent.get_children()
             if (len(children) == 0):
                 # print("no further children")
+                # print("id", parent.nodeid)
+                if (not (parent.nodeid.Identifier == 6045 and parent.nodeid.NamespaceIndex == 4)):
+                    # return
+                    pass
                 read_id = ua.ReadValueId()
                 read_id.NodeId = parent.nodeid
                 read_id.AttributeId = ua.AttributeIds.Value
 
                 params = ua.MonitoringParameters()
-                params.ClientHandle = self.__item_id_counter
                 self.__item_id_counter += 1
+                # needs to be before, because ClientHandle of 0 is not allowed
+                params.ClientHandle = self.__item_id_counter
+                params.SamplingInterval = 0 # 0 means fastest sensible time as set by the server
 
                 item = ua.MonitoredItemCreateRequest()
                 item.ItemToMonitor = read_id

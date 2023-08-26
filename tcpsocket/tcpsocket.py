@@ -9,7 +9,9 @@ class TcpSocket:
         self.__value = 0
         self.__reader, self.__writer = await asyncio.open_connection(address, port)
         # TODO: the protocol selection is still very much a prototype
-        self.__writer.write('{"protocol": "native", "version": 0}'.encode())
+        self.__writer.write(
+            '{"protocol": "native", "version": 0, "name": "OPC Backend"}'.encode()
+        )
         await self.__writer.drain()
 
     def get_reader(self):

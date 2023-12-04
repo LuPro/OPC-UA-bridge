@@ -36,23 +36,23 @@ def read_arguments(args):
 async def main():
     arg_parser = argparse.ArgumentParser(description="todo")
     arg_parser.add_argument("data", metavar="IN_DATA", nargs="?", help="Enter the OPC UA endpoint to connect to")
+    arg_parser.add_argument("-n", "--name", metavar="NAME", help="Enter the name that the bridge reports to frontend. If left empty defaults to \"OPC Backend\".")
 
     args = arg_parser.parse_args()
 
+    opcua_address = "opc.tcp://0.0.0.0:4840/freeopcua/server/"
+    if (args.data != None):
+        opcua_address = args.data
+
     tcpsocket = TcpSocket()
-    # asyncio.gather(
-    #     tcpsocket.connect()
-    # )
-    # await tcpsocket.connect("192.168.0.101")
-    await tcpsocket.connect()
+    await tcpsocket.connect(name=args.name)
     # I'd like to set this up before connecting tcp, but before connecting
     # I have no stream reader/writer
     forwarder = Forwarder(tcpsocket.get_reader(), tcpsocket.get_writer())
 
     opcua = OpcuaClient(forwarder.get_opcua_tcp_queue(), forwarder.get_tcp_opcua_queue())
     asyncio.gather(
-        # opcua.connect("opc.tcp://172.21.55.10:4840"),
-        opcua.connect("opc.tcp://0.0.0.0:4840/freeopcua/server/"),
+        opcua.connect(opcua_address),
         forwarder.read_tcp(),
         forwarder.write_tcp(),
         opcua.write_opcua()

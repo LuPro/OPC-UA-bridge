@@ -19,25 +19,32 @@ class SubHandler(object):
     """
 
     async def datachange_notification(self, node, val, data):
-        # print("New data change event", node, val, data)
-        # print("New data change event", node, val)
         json_data = {"packets": []}
 
-        # print("data type", await node.read_data_type_as_variant_type())
         if (await node.read_data_type_as_variant_type() == VariantType.Boolean):
-            val = 1 if val else 0
-        # TODO: investigate which if any other data types need to be supported
+            if (isinstance(val, list)):
+                # if val is a list, it's actually an array of booleans
+                # asyncua doesn't have a specific type for that
+                # right now we just support counting the number of
+                # true entries as that's all we need here, but big TODO
+                true_count = 0
+                for bool_val in val:
+                    if (bool_val):
+                        true_count += 1
+                val = true_count
+            else:
+                val = 1 if val else 0
+        # TODO: investigate which, if any, other data types need support
         # here or if the rest is fine with implicit casts
 
         data_packet = {
             "name": "/".join((await node.get_path(as_string=True))[2:]),
             "value": val
         }
-        # TODO: handle OPC methods since they have a different val that is not serializable
+        # TODO: handle OPC methods; they have a val that is not serializable
         json_data["packets"].append(data_packet)
         # print("JSON", json_data)
         await self.__queue.put(json.dumps(json_data))
-        # print("queue size:", self.__queue.qsize())
 
     def event_notification(self, event):
         print("New event", event)
@@ -50,7 +57,7 @@ class OpcuaClient:
     async def write_opcua(self):
         while True:
             data = json.loads(await self.__tcp_opc_queue.get())
-            print("tcp_opc:", data)
+            # print("tcp_opc:", data)
             try:
                 node = await self.__client.nodes.objects.get_child(data["packets"][0]["name"].split("/"))
                 value = data["packets"][0]["value"]
@@ -62,7 +69,6 @@ class OpcuaClient:
                     value = float(value)
                 # TODO: support remaining needed data types
 
-                # await node.write_value(ua.Variant(value, data_variant_type))
                 await node.write_value(
                     ua.DataValue(ua.Variant(value, data_variant_type))
                 )
@@ -86,46 +92,19 @@ class OpcuaClient:
 
                 if (is_mock_server):
                     uri = "http://examples.freeopcua.github.io"
-                else:
-                    uri = "http://auto.tuwien.ac.at/iot-lab/Node-RED/01_Distribution"
-                idx = await client.get_namespace_index(uri)
-                _logger.info("index of our namespace is %s", idx)
+                    idx = await client.get_namespace_index(uri)
+                    _logger.info("index of our namespace is %s", idx)
 
-                # get a specific node knowing its node id
-                # var = client.get_node(ua.NodeId(1002, 2))
-                # var = client.get_node("ns=3;i=2002")
-                # print(var)
-                # await var.read_data_value() # get value of node as a DataValue object
-                # await var.read_value() # get value of node as a python builtin
-                # await var.write_value(ua.Variant([23], ua.VariantType.Int64)) #set node value using explicit data type
-                # await var.write_value(3.9) # set node value using implicit data type
-
-                # Now getting a variable node using its browse path
                 handler = SubHandler(self.__opc_tcp_queue)
                 self.__items = ua.CreateMonitoredItemsParameters()
                 await self.load_opc_nodes(client.nodes.objects)
-                print("items", len(self.__items.ItemsToCreate))
+                # print("items", len(self.__items.ItemsToCreate))
                 sub = await self.__client.create_subscription(100, handler)
                 print("number of monitored items:", len(self.__items.ItemsToCreate))
                 await sub.create_monitored_items(self.__items.ItemsToCreate)
-                # _logger.info("done")
-                if (is_mock_server):
-                    myvar = await client.nodes.root.get_child(["0:Objects", "2:MyObject", "2:MyVariable1"])
-                    obj = await client.nodes.root.get_child(["0:Objects", "2:MyObject"])
-                else:
-                    myvar = await client.nodes.objects.get_child(["4:01_Distribution", "4:Indicators", "4:Lights", "4:Red"])
-                _logger.info("myvar is: %r", myvar)
 
                 await asyncio.sleep(0.1)
 
-                # we can also subscribe to events from server
-                # await sub.subscribe_events()
-                # await sub.unsubscribe(handle)
-                # await sub.delete()
-
-                # calling a method on server
-                # res = await obj.call_method("2:multiply", 3, 2)
-                # _logger.info("method result is: %r", res)
                 while True:
                     await asyncio.sleep(1)
             except Exception as e:
@@ -148,7 +127,9 @@ class OpcuaClient:
                 self.__item_id_counter += 1
                 # needs to be before, because ClientHandle of 0 is not allowed
                 params.ClientHandle = self.__item_id_counter
-                params.SamplingInterval = 0 # 0 means fastest sensible time as set by the server
+
+                # 0 means fastest sensible time as set by the server
+                params.SamplingInterval = 0
 
                 item = ua.MonitoredItemCreateRequest()
                 item.ItemToMonitor = read_id
@@ -162,33 +143,10 @@ class OpcuaClient:
                     if (not child.__str__() in self.__node_blacklist):
                         await self.load_opc_nodes(child)
                     else:
-                        print("Ignored blacklisted node:", child.__str__())
+                        pass
+                        # print("Ignored blacklisted node:", child.__str__())
         except Exception as e:
             print("[load_opc_nodes] exception:", e)
-
-    # async def load_opc_structure(self, sub_handler, parent):
-    #     try:
-    #         children = await parent.get_children()
-    #         if (len(children) == 0):
-    #             # print("no further children")
-    #             if ((await parent.read_browse_name()).Name == "Red" or
-    #                 (await parent.read_browse_name()).Name == "Product" or
-    #                 (await parent.read_browse_name()).Name == "MyVariable" or True):
-    #                 print ("subscribing to", (await parent.read_browse_name()).Name)
-    #                 sub = await self.__client.create_subscription(10, sub_handler)
-    #                 await sub.subscribe_data_change(parent)
-    #                 self.__sub_count += 1
-    #                 print (self.__sub_count)
-    #         else:
-    #             # print("children size:", len(children))
-    #             for child in children:
-    #                 # print("  -- child", child)
-    #                 if (not child.__str__() in self.__node_blacklist):
-    #                     await self.load_opc_structure(sub_handler, child)
-    #                 else:
-    #                     print("Ignored blacklisted node:", child.__str__())
-    #     except Exception as e:
-    #         print("exception:", e)
 
     def __init__(self, opc_tcp_queue, tcp_opc_queue):
         self.__item_id_counter = 0

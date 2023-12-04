@@ -23,7 +23,7 @@ class Forwarder:
     async def write_tcp(self):
         while True:
             data = await self.__queue_opcua_tcp.get()
-            print("opc_tcp:\n ", data)
+            # print("opc_tcp:\n ", data)
             try:
                 self.__tcp_writer.write(data.encode())
             except Exception as e:

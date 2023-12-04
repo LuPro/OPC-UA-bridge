@@ -35,17 +35,25 @@ def read_arguments(args):
 
 async def main():
     arg_parser = argparse.ArgumentParser(description="todo")
-    arg_parser.add_argument("data", metavar="IN_DATA", nargs="?", help="Enter the OPC UA endpoint to connect to")
+    arg_parser.add_argument("-f", "--frontend", metavar="FRONTEND", help="Enter the adress and port of the frontend to connect to. If left empty defaults to \"localhost:3000\"")
+    arg_parser.add_argument("-b", "--backend", metavar="BACKEND", help="Enter the OPC UA endpoint to connect to")
     arg_parser.add_argument("-n", "--name", metavar="NAME", help="Enter the name that the bridge reports to frontend. If left empty defaults to \"OPC Backend\".")
 
     args = arg_parser.parse_args()
 
     opcua_address = "opc.tcp://0.0.0.0:4840/freeopcua/server/"
-    if (args.data != None):
-        opcua_address = args.data
+    if (args.backend is not None):
+        opcua_address = args.backend
+
+    frontend_ip = "localhost"
+    frontend_port = 3000
+    if (args.frontend is not None):
+        address_parts = args.frontend.split(":")
+        frontend_ip = address_parts[0]
+        frontend_port = address_parts[1]
 
     tcpsocket = TcpSocket()
-    await tcpsocket.connect(name=args.name)
+    await tcpsocket.connect(frontend_ip, frontend_port, args.name)
     # I'd like to set this up before connecting tcp, but before connecting
     # I have no stream reader/writer
     forwarder = Forwarder(tcpsocket.get_reader(), tcpsocket.get_writer())

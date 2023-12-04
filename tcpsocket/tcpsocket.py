@@ -12,7 +12,7 @@ class TcpSocket:
             name = "OPC Backend"
         # TODO: the protocol selection is still very much a prototype
         self.__writer.write(
-            ('{"protocol": "native", "version": 0, "name": "%s"}' % name).encode()
+            ('{"protocol": "native", "version": 0, "name": "%s"}' % name).encode() + b'\x00'
         )
         await self.__writer.drain()
 

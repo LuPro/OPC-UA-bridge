@@ -25,7 +25,7 @@ class Forwarder:
             data = await self.__queue_opcua_tcp.get()
             # print("opc_tcp:\n ", data)
             try:
-                self.__tcp_writer.write(data.encode())
+                self.__tcp_writer.write(data.encode() + b'\x00')
             except Exception as e:
                 print("exception during writing", e)
             await self.__tcp_writer.drain()

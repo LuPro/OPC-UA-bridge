@@ -21,7 +21,8 @@ class SubHandler(object):
     async def datachange_notification(self, node, val, data):
         json_data = {"packets": []}
 
-        if (await node.read_data_type_as_variant_type() == VariantType.Boolean):
+        variant_type = await node.read_data_type_as_variant_type()
+        if (variant_type == VariantType.Boolean):
             if (isinstance(val, list)):
                 # if val is a list, it's actually an array of booleans
                 # asyncua doesn't have a specific type for that
@@ -34,6 +35,10 @@ class SubHandler(object):
                 val = true_count
             else:
                 val = 1 if val else 0
+        elif (variant_type == VariantType.ExtensionObject):
+            # Extension Objects contain meta info about the server which
+            # don't interest us and we can't handle
+            return
         # TODO: investigate which, if any, other data types need support
         # here or if the rest is fine with implicit casts
 
@@ -100,7 +105,7 @@ class OpcuaClient:
                 await self.load_opc_nodes(client.nodes.objects)
                 # print("items", len(self.__items.ItemsToCreate))
                 sub = await self.__client.create_subscription(100, handler)
-                print("number of monitored items:", len(self.__items.ItemsToCreate))
+                print("# of monitored items:", len(self.__items.ItemsToCreate))
                 await sub.create_monitored_items(self.__items.ItemsToCreate)
 
                 await asyncio.sleep(0.1)
@@ -116,8 +121,9 @@ class OpcuaClient:
             if (len(children) == 0):
                 # print("no further children")
                 # print("id", parent.nodeid)
-                if (not (parent.nodeid.Identifier == 6045 and parent.nodeid.NamespaceIndex == 4)):
-                    # return
+                if (not (parent.nodeid.Identifier == 6045
+                         and parent.nodeid.NamespaceIndex == 4)):
+                    # hardcoded to skip meta vars of OPC server
                     pass
                 read_id = ua.ReadValueId()
                 read_id.NodeId = parent.nodeid

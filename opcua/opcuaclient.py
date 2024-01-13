@@ -3,8 +3,6 @@ import asyncio
 
 from asyncua import Client, ua
 from asyncua.ua.uatypes import VariantType as VariantType
-from asyncua.ua.uatypes import DataValue as DataValue
-from asyncua.common import ua_utils
 import json
 
 _logger = logging.getLogger("root")
